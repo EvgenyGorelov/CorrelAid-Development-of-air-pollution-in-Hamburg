@@ -1,0 +1,101 @@
+library(shiny)
+library(vroom)
+library(ggplot2)
+library(dplyr)
+
+data <- vroom::vroom("datalong.csv")
+
+ui <- fluidPage(
+
+  shiny::sidebarLayout(
+    sidebarPanel(
+      selectInput(
+        inputId = "sensor", 
+        label = "Select Sensor", 
+        choices = c("All", unique(data$Sensor)), 
+        selected =  unique(data$Sensor)[1]
+      ), 
+      
+      selectInput(
+        inputId = "chemical", 
+        label = "Select a Chemical", 
+        choices = c("All", unique(data$Chemical)), 
+        selected = unique(data$Chemical)[1]
+      ), 
+      
+      shiny::dateRangeInput(
+        inputId = "date", 
+        label = "Select a date range", 
+        start = "2019-01-01", 
+        end = max(data$observation_period) , 
+        min = min(data$observation_period), 
+        max = max(data$observation_period)
+      )
+      
+    ), 
+    
+    mainPanel(
+      
+      plotOutput(
+        outputId = "plt1"
+      )
+      
+    )
+  )
+  
+    
+)
+
+server <- function(input, output, session) {
+  
+dt <- reactive({
+  
+  if (input$sensor == "All") {
+    
+    data <- data 
+    
+  } else {
+    
+    data <- data %>% dplyr::filter(Sensor == input$sensor)
+  }
+  
+    
+  if (input$chemical == "All") {
+    
+    data <- data
+    
+  } else {
+    
+   data <-  data %>% dplyr::filter(Chemical == input$chemical)
+   
+  }
+  
+
+  data %>% mutate(observation_period = as.Date(observation_period)) %>% 
+    dplyr::filter(dplyr::between(
+    x = observation_period, 
+    left = input$date[1], 
+    right = input$date[2]
+  ))
+  
+
+
+})
+
+
+output$plt1 <- renderPlot({
+  
+    ggplot(dt(), aes(observation_period, values)) +
+    geom_jitter(col = "steelblue", alpha = 0.076) +
+    ylab("Values") +
+    xlab(NULL) +
+    ggthemes::theme_pander()
+    
+}) 
+ 
+  
+  
+  
+}
+
+shinyApp(ui, server)
